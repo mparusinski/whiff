@@ -1,6 +1,7 @@
 use std::fs::{File, FileTimes};
 use std::time::SystemTime;
 use std::io;
+use std::path::Path;
 use clap::Parser;
 
 #[derive(Parser, Debug)]
@@ -46,8 +47,12 @@ struct Args {
     inputs: Vec<String>
 }
 
-fn whiff(path: String) -> io::Result<()>{
-    let mut fh = File::options().append(true).open(path)?;
+fn whiff(args: &Args, path: String) -> io::Result<()>{
+    let fh = if Path::new(&path).exists() {
+        File::options().append(true).open(path)?
+    } else {
+        File::create_new(path)?
+    };
     let now = SystemTime::now();
     let times = FileTimes::new()
         .set_accessed(now)
@@ -59,8 +64,10 @@ fn main() {
     let args = Args::parse();
     // println!("{args:#?}");
 
-    let results: io::Result<()> = args.inputs.into_iter()
-        .map(whiff)
+    let results: io::Result<()> = args.inputs.clone().into_iter()
+        .map(|path| {
+            whiff(&args, path)
+        })
         .collect();
     // println!("Results: {:?}", results)
 }
