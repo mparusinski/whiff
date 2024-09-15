@@ -1,11 +1,11 @@
 use std::env;
 use std::fs::File;
 use std::io;
-use std::option;
 use clap::Parser;
 
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
+#[command(author, version,
+    about = "whiff: a rust replacement for `touch` with batteries", long_about = None)]
 struct Args {
     #[arg(short, help = "change only the access time")]
     access: bool,
@@ -41,14 +41,17 @@ struct Args {
         help = "specify which time to change: access (-a): 'access', \
                 'atime', 'use'; modification time (-m): 'modify', 'mtime'")]
     time_to_change: Option<String>,
+
+    #[arg(value_name = "FILES")]
+    inputs: Vec<String>
 }
 
 fn main() {
     let args = Args::parse();
     println!("{args:#?}");
 
-    // let results: io::Result<Vec<File>> = env::args().skip(1).
-    //     map(File::create_new).
-    //     collect();
-    // println!("Results: {:?}", results)
+    let results: io::Result<Vec<File>> = args.inputs.into_iter().
+        map(File::create_new).
+        collect();
+    println!("Results: {:?}", results)
 }
