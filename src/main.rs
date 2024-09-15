@@ -49,15 +49,15 @@ struct Args {
 
 fn whiff(args: &Args, path: String) -> io::Result<()>{
     let fh = if Path::new(&path).exists() {
+        File::options().append(true).open(path)?
+    } else {
         if !args.no_create {
-            File::options().append(true).open(path)?
+            File::create_new(path)?
         } else {
             // touch command silently does  nothing when
             // file does not exist and option -c is on
             return Ok(());
         }
-    } else {
-        File::create_new(path)?
     };
     let now = SystemTime::now();
     let times = FileTimes::new()
