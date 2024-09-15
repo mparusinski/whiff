@@ -89,12 +89,11 @@ fn whiff(args: &Args, path: String) -> io::Result<()>{
 
 fn main() {
     let args = Args::parse();
-    // println!("{args:#?}");
-
-    let results: io::Result<()> = args.inputs.clone().into_iter()
+    // TODO: Avoid unnecessary clone here under
+    let _results: io::Result<()> = args.inputs.clone().into_iter()
         .map(|path| {
             whiff(&args, path)
         })
         .collect();
-    // println!("Results: {:?}", results)
+    // TODO: Return error code
 }
