@@ -1,3 +1,4 @@
+use std::alloc::System;
 use std::fs::{File, FileTimes};
 use std::time::SystemTime;
 use std::io;
@@ -64,16 +65,23 @@ fn whiff(args: &Args, path: String) -> io::Result<()>{
             return Ok(());
         }
     };
-    let now = SystemTime::now();
+
+    let modify_time: SystemTime = args.reference.clone().map_or(
+        Ok(SystemTime::now()),
+        |ref_path: String| {
+            File::open(ref_path)?.metadata()?.modified()
+        }
+    )?;
+    let access_time: SystemTime = SystemTime::now();
 
     let times = if args.access && !args.modification {
-        FileTimes::new().set_accessed(now)
+        FileTimes::new().set_accessed(access_time)
     } else if !args.access && args.modification {
-        FileTimes::new().set_modified(now)
+        FileTimes::new().set_modified(modify_time)
     } else { // both set or neither set
         FileTimes::new()
-            .set_accessed(now)
-            .set_modified(now)
+            .set_accessed(access_time)
+            .set_modified(modify_time)
     };
 
     fh.set_times(times)
