@@ -1,11 +1,11 @@
-use std::env;
-use std::fs::File;
+use std::fs::{File, FileTimes};
+use std::time::SystemTime;
 use std::io;
 use clap::Parser;
 
 #[derive(Parser, Debug)]
 #[command(author, version,
-    about = "whiff: a rust replacement for `touch` with batteries", long_about = None)]
+    about = "whiff: a rust replacement for `touch`", long_about = None)]
 struct Args {
     #[arg(short, help = "change only the access time")]
     access: bool,
@@ -46,12 +46,21 @@ struct Args {
     inputs: Vec<String>
 }
 
+fn whiff(path: String) -> io::Result<()>{
+    let mut fh = File::options().append(true).open(path)?;
+    let now = SystemTime::now();
+    let times = FileTimes::new()
+        .set_accessed(now)
+        .set_modified(now);
+    fh.set_times(times)
+}
+
 fn main() {
     let args = Args::parse();
-    println!("{args:#?}");
+    // println!("{args:#?}");
 
-    let results: io::Result<Vec<File>> = args.inputs.into_iter().
-        map(File::create_new).
-        collect();
-    println!("Results: {:?}", results)
+    let results: io::Result<()> = args.inputs.into_iter()
+        .map(whiff)
+        .collect();
+    // println!("Results: {:?}", results)
 }
