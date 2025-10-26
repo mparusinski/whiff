@@ -55,6 +55,7 @@
             hooks = {
               nixfmt.enable = true;
               rustfmt.enable = true;
+              convco.enable = true;
             };
           };
         };
