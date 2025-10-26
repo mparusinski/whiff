@@ -1,9 +1,8 @@
-
+use clap::Parser;
 use std::fs::{File, FileTimes};
-use std::time::SystemTime;
 use std::io;
 use std::path::Path;
-use clap::Parser;
+use std::time::SystemTime;
 
 #[derive(Parser, Debug)]
 #[command(author, version,
@@ -16,44 +15,62 @@ struct Args {
     no_create: bool,
 
     // TODO: Not implemented yet
-    #[arg(short, long, value_name = "STRING",
-        help = "parse STRING and use it instead of current time")]
+    #[arg(
+        short,
+        long,
+        value_name = "STRING",
+        help = "parse STRING and use it instead of current time"
+    )]
     date: Option<String>,
 
     #[arg(short = 'f', help = "(ignored)")]
     ignore_force: bool,
 
     // TODO: Not implemented yet
-    #[arg(short = 'n', long,
+    #[arg(
+        short = 'n',
+        long,
         help = "affect each symbolic link instead of any referenced file \
                 (useful only on systems that can change the timestamps of \
-                a symlink)")]
+                a symlink)"
+    )]
     no_dereference: bool,
 
     #[arg(short, help = "change only the modification time")]
     modification: bool,
 
     // TODO: Not implemented yet
-    #[arg(short, long, value_name = "FILE", help = "use this file's times instead of current time")]
+    #[arg(
+        short,
+        long,
+        value_name = "FILE",
+        help = "use this file's times instead of current time"
+    )]
     reference: Option<String>,
 
     // TODO: Not implemented yet
-    #[arg(short = 't', help = "[[CC]YYMMDDhhmm[.ss] \
+    #[arg(
+        short = 't',
+        help = "[[CC]YYMMDDhhmm[.ss] \
                          use specified time instead of current time, with a \
-                         date-time format that differs from -d's")]
+                         date-time format that differs from -d's"
+    )]
     specified_time: Option<String>,
 
     // TODO: Not implemented yet
-    #[arg(long = "time", value_name = "WORD",
+    #[arg(
+        long = "time",
+        value_name = "WORD",
         help = "specify which time to change: access (-a): 'access', \
-                'atime', 'use'; modification time (-m): 'modify', 'mtime'")]
+                'atime', 'use'; modification time (-m): 'modify', 'mtime'"
+    )]
     time_to_change: Option<String>,
 
     #[arg(value_name = "FILES")]
-    inputs: Vec<String>
+    inputs: Vec<String>,
 }
 
-fn whiff(args: &Args, path: String) -> io::Result<()>{
+fn whiff(args: &Args, path: String) -> io::Result<()> {
     let fh = if Path::new(&path).exists() {
         File::options().append(true).open(path)?
     } else {
@@ -66,19 +83,20 @@ fn whiff(args: &Args, path: String) -> io::Result<()>{
         }
     };
 
-    let modify_time: SystemTime = args.reference.clone().map_or(
-        Ok(SystemTime::now()),
-        |ref_path: String| {
+    let modify_time: SystemTime = args
+        .reference
+        .clone()
+        .map_or(Ok(SystemTime::now()), |ref_path: String| {
             File::open(ref_path)?.metadata()?.modified()
-        }
-    )?;
+        })?;
     let access_time: SystemTime = SystemTime::now();
 
     let times = if args.access && !args.modification {
         FileTimes::new().set_accessed(access_time)
     } else if !args.access && args.modification {
         FileTimes::new().set_modified(modify_time)
-    } else { // both set or neither set
+    } else {
+        // both set or neither set
         FileTimes::new()
             .set_accessed(access_time)
             .set_modified(modify_time)
@@ -90,10 +108,11 @@ fn whiff(args: &Args, path: String) -> io::Result<()>{
 fn main() {
     let args = Args::parse();
     // TODO: Avoid unnecessary clone here under
-    let _results: io::Result<()> = args.inputs.clone().into_iter()
-        .map(|path| {
-            whiff(&args, path)
-        })
+    let _results: io::Result<()> = args
+        .inputs
+        .clone()
+        .into_iter()
+        .map(|path| whiff(&args, path))
         .collect();
     // TODO: Return error code
 }
