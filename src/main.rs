@@ -73,14 +73,12 @@ struct Args {
 fn whiff(args: &Args, path: String) -> io::Result<()> {
     let fh = if Path::new(&path).exists() {
         File::options().append(true).open(path)?
+    } else if !args.no_create {
+        File::create_new(path)?
     } else {
-        if !args.no_create {
-            File::create_new(path)?
-        } else {
-            // touch command silently does  nothing when
-            // file does not exist and option -c is on
-            return Ok(());
-        }
+        // touch command silently does nothing when
+        // file does not exist and option -c is on
+        return Ok(());
     };
 
     let modify_time: SystemTime = args
@@ -112,7 +110,6 @@ fn main() {
         .inputs
         .clone()
         .into_iter()
-        .map(|path| whiff(&args, path))
-        .collect();
+        .try_for_each(|path| whiff(&args, path));
     // TODO: Return error code
 }
