@@ -118,8 +118,8 @@ fn main() {
     let cli = Cli::parse();
 
     // TODO: Refactor this code by moving to another function
-    match &cli.gen_completions {
-        Some(maybe_shell) => match maybe_shell {
+    if let Some(maybe_shell) = &cli.gen_completions {
+        match maybe_shell {
             Some(sh) => {
                 generate(*sh, &mut Cli::command(), "whiff", &mut io::stdout());
             }
@@ -127,8 +127,7 @@ fn main() {
                 eprintln!("Generate completions request but no shell found");
                 process::exit(1);
             }
-        },
-        None => {}
+        }
     }
 
     // TODO: Avoid unnecessary clone here under
