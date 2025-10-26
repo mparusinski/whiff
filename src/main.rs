@@ -1,13 +1,20 @@
+use clap::CommandFactory;
 use clap::Parser;
 use std::fs::{File, FileTimes};
 use std::io;
 use std::path::Path;
+use std::process;
 use std::time::SystemTime;
 
+#[cfg(feature = "completions")]
+use clap_complete::{generate, Shell};
+
 #[derive(Parser, Debug)]
-#[command(author, version,
+#[command(
+    name = "whiff",
+    version,
     about = "whiff: a rust replacement for `touch`", long_about = None)]
-struct Args {
+struct Cli {
     #[arg(short, help = "change only the access time")]
     access: bool,
 
@@ -68,12 +75,16 @@ struct Args {
 
     #[arg(value_name = "FILES")]
     inputs: Vec<String>,
+
+    #[cfg(feature = "completions")]
+    #[arg(long, hide = true, exclusive = true)]
+    gen_completions: Option<Option<Shell>>,
 }
 
-fn whiff(args: &Args, path: String) -> io::Result<()> {
+fn whiff(cli: &Cli, path: String) -> io::Result<()> {
     let fh = if Path::new(&path).exists() {
         File::options().append(true).open(path)?
-    } else if !args.no_create {
+    } else if !cli.no_create {
         File::create_new(path)?
     } else {
         // touch command silently does nothing when
@@ -81,7 +92,7 @@ fn whiff(args: &Args, path: String) -> io::Result<()> {
         return Ok(());
     };
 
-    let modify_time: SystemTime = args
+    let modify_time: SystemTime = cli
         .reference
         .clone()
         .map_or(Ok(SystemTime::now()), |ref_path: String| {
@@ -89,9 +100,9 @@ fn whiff(args: &Args, path: String) -> io::Result<()> {
         })?;
     let access_time: SystemTime = SystemTime::now();
 
-    let times = if args.access && !args.modification {
+    let times = if cli.access && !cli.modification {
         FileTimes::new().set_accessed(access_time)
-    } else if !args.access && args.modification {
+    } else if !cli.access && cli.modification {
         FileTimes::new().set_modified(modify_time)
     } else {
         // both set or neither set
@@ -104,12 +115,27 @@ fn whiff(args: &Args, path: String) -> io::Result<()> {
 }
 
 fn main() {
-    let args = Args::parse();
+    let cli = Cli::parse();
+
+    // TODO: Refactor this code by moving to another function
+    match &cli.gen_completions {
+        Some(maybe_shell) => match maybe_shell {
+            Some(sh) => {
+                generate(*sh, &mut Cli::command(), "whiff", &mut io::stdout());
+            }
+            None => {
+                eprintln!("Generate completions request but no shell found");
+                process::exit(1);
+            }
+        },
+        None => {}
+    }
+
     // TODO: Avoid unnecessary clone here under
-    let _results: io::Result<()> = args
+    let _results: io::Result<()> = cli
         .inputs
         .clone()
         .into_iter()
-        .try_for_each(|path| whiff(&args, path));
+        .try_for_each(|path| whiff(&cli, path));
     // TODO: Return error code
 }
