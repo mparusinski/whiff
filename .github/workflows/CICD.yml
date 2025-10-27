@@ -111,6 +111,7 @@ jobs:
           arm-unknown-linux-*) sudo apt-get -y update ; sudo apt-get -y install gcc-arm-linux-gnueabihf ;;
           aarch64-unknown-linux-gnu) sudo apt-get -y update ; sudo apt-get -y install gcc-aarch64-linux-gnu ;;
         esac
+        sudo apt-get -y install pandoc
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -180,6 +181,11 @@ jobs:
       id: completions
       shell: bash
       run: make completions
+
+    - name: Generate manpage
+      id: manpage
+      shell: bash
+      run: make doc/whiff.1
 
     - name: Create tarball
       id: package

@@ -29,7 +29,10 @@ autocomplete/_whiff: $(EXE)
 	$(comp_dir)
 	$(EXE) --gen-completions zsh > $@
 
-install: $(EXE) completions
+doc/whiff.1: doc/whiff.1.md
+	pandoc --standalone --to man doc/whiff.1.md -o doc/whiff.1
+
+install: $(EXE) completions doc/whiff.1
 	install -Dm755 $(EXE) $(DESTDIR)$(bindir)/whiff
 	install -Dm644 autocomplete/whiff.bash $(DESTDIR)/$(datadir)/bash-completion/completions/$(exe_name)
 	install -Dm644 autocomplete/whiff.fish $(DESTDIR)/$(datadir)/fish/vendor_completions.d/$(exe_name).fish

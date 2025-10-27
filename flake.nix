@@ -91,6 +91,7 @@
                 rustc
                 cargo
                 clippy
+                pandoc
               ]
               ++ buildInputs
               ++ nativeBuildInputs;
