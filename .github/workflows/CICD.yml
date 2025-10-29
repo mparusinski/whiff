@@ -95,7 +95,7 @@ jobs:
           - { target: aarch64-apple-darwin        , os: macos-14                      }
           - { target: x86_64-pc-windows-gnu       , os: windows-2022                  }
           - { target: x86_64-pc-windows-msvc      , os: windows-2022                  }
-          - { target: aarch64-pc-windows-msvc     , os: windows-11-arm                }
+#          - { target: aarch64-pc-windows-msvc     , os: windows-11-arm                }
           - { target: x86_64-unknown-linux-gnu    , os: ubuntu-24.04, use-cross: true }
           - { target: x86_64-unknown-linux-musl   , os: ubuntu-24.04, use-cross: true }
     env:
@@ -111,7 +111,6 @@ jobs:
           arm-unknown-linux-*) sudo apt-get -y update ; sudo apt-get -y install gcc-arm-linux-gnueabihf ;;
           aarch64-unknown-linux-gnu) sudo apt-get -y update ; sudo apt-get -y install gcc-aarch64-linux-gnu ;;
         esac
-        sudo apt-get -y install pandoc
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -182,11 +181,6 @@ jobs:
       shell: bash
       run: make completions
 
-    - name: Generate manpage
-      id: manpage
-      shell: bash
-      run: make doc/whiff.1
-
     - name: Create tarball
       id: package
       shell: bash
@@ -235,7 +229,7 @@ jobs:
 
     - name: "Artifact upload: tarball"
       id: upload-tarball
-      uses: actions/upload-artifact@master
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ steps.package.outputs.PKG_NAME }}
         path: ${{ steps.package.outputs.PKG_PATH }}
@@ -260,14 +254,14 @@ jobs:
       if: steps.is-release.outputs.IS_RELEASE
       with:
         subject-name: ${{ steps.package.outputs.PKG_NAME }}
-        subject-digest: sha256::${{ steps.upload-tarball.artifact-digest }}
+        subject-digest: sha256:${{ steps.upload-tarball.outputs.artifact-digest }}
 
     - name: "Attest artifact: Debian package"
       uses: actions/attest-build-provenance@v3
       if: 'steps.is-release.outputs.IS_RELEASE && steps.debian-package.outputs.DPKG_NAME'
       with:
         subject-name: ${{ steps.debian-package.outputs.DPKG_NAME }}
-        subject-digest: sha256::${{ steps.upload-deb.outputs.artifact-digest }}
+        subject-digest: sha256:${{ steps.upload-deb.outputs.artifact-digest }}
 
     - name: Publish archives and packages
       uses: softprops/action-gh-release@v2

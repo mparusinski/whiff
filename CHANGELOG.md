@@ -1,3 +1,3 @@
-# Upcoming release
+# v0.1.0
 
-N/A
+First release of `whiff`
