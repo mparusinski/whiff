@@ -92,6 +92,7 @@
                 cargo
                 clippy
                 pandoc
+                rust-analyzer
               ]
               ++ buildInputs
               ++ nativeBuildInputs;
