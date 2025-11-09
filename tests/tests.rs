@@ -1,4 +1,5 @@
 use std::env;
+use std::fs;
 use std::io;
 // #[cfg(unix)]
 // use std::os::unix;
@@ -6,8 +7,11 @@ use std::io;
 use std::os::windows;
 use std::path::{Path, PathBuf};
 use std::process;
+use std::time::SystemTime;
 
 use tempdir::TempDir;
+
+static JIFFY_MS: u128 = 100;
 
 pub struct TestEnv {
     /// Temporary working directory.
@@ -71,9 +75,36 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_simple() {
+    fn test_no_args() {
+        let now = SystemTime::now();
         let te = TestEnv::new();
-        let output = te.run_command(Path::new("empty"));
+        let filename = Path::new("empty");
+        let output = te.run_command(filename);
+
         assert!(output.status.success());
+
+        let target = te.test_root().join(filename);
+
+        // Checking file exists
+        assert!(fs::exists(target.clone()).expect("Unable to determine target file existence"));
+
+        let metadata = fs::metadata(target.clone()).expect("Unable to access target file metadata");
+        // Checking access timestamp are close enough as there is always
+        // some delay between when the test starts and the file is created
+        let access_time = metadata
+            .accessed()
+            .expect("Unable to fetch target file access time");
+        let access_time_diff = access_time
+            .duration_since(now)
+            .expect("Unable to compute access time delta");
+        assert!(access_time_diff.as_millis() < JIFFY_MS);
+
+        let mod_time = metadata
+            .accessed()
+            .expect("Unable to fetch target file modification time");
+        let mod_time_diff = mod_time
+            .duration_since(now)
+            .expect("Unable to compute modification time delta");
+        assert!(mod_time_diff.as_millis() < JIFFY_MS);
     }
 }
