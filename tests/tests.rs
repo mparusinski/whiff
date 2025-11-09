@@ -3,6 +3,7 @@ use std::fs;
 use std::io;
 // #[cfg(unix)]
 // use std::os::unix;
+use std::fs::File;
 #[cfg(windows)]
 use std::os::windows;
 use std::path::{Path, PathBuf};
@@ -12,6 +13,7 @@ use std::time::SystemTime;
 use tempdir::TempDir;
 
 static JIFFY_MS: u128 = 100;
+static EXISTING_FILE: &str = "existing";
 
 pub struct TestEnv {
     /// Test start
@@ -60,6 +62,9 @@ impl TestEnv {
         let temp_dir = create_working_directory().expect("Working directory");
         let whiff_exe = find_whiff_exe();
 
+        let existing_filepath = temp_dir.path().join(Path::new(&EXISTING_FILE));
+        File::create(existing_filepath).expect("Unable to create existing file for test");
+
         TestEnv {
             start,
             temp_dir,
@@ -100,6 +105,30 @@ impl TestEnv {
             panic!("Failure did not occur.");
         }
     }
+
+    pub fn assert_file_touched(&self, file: &str) {
+        let filepath = self.test_root().join(file);
+        assert!(fs::exists(filepath.clone()).expect("Unable to determine target file existence"));
+
+        let metadata = fs::metadata(&filepath).expect("Unable to access target file metadata");
+        // Checking access timestamp are close enough as there is always
+        // some delay between when the test starts and the file is created
+        let access_time = metadata
+            .accessed()
+            .expect("Unable to fetch target file access time");
+        let access_time_diff = access_time
+            .duration_since(self.start)
+            .expect("Unable to compute access time delta");
+        assert!(access_time_diff.as_millis() < JIFFY_MS);
+
+        let mod_time = metadata
+            .accessed()
+            .expect("Unable to fetch target file modification time");
+        let mod_time_diff = mod_time
+            .duration_since(self.start)
+            .expect("Unable to compute modification time delta");
+        assert!(mod_time_diff.as_millis() < JIFFY_MS);
+    }
 }
 
 #[cfg(test)]
@@ -111,30 +140,15 @@ mod tests {
         let te = TestEnv::new();
         let filename = "empty";
         te.assert_success_and_get_output(&[filename]);
+        te.assert_file_touched(filename);
+    }
 
-        let target = te.test_root().join(filename);
-
-        // Checking file exists
-        assert!(fs::exists(target.clone()).expect("Unable to determine target file existence"));
-
-        let metadata = fs::metadata(target.clone()).expect("Unable to access target file metadata");
-        // Checking access timestamp are close enough as there is always
-        // some delay between when the test starts and the file is created
-        let access_time = metadata
-            .accessed()
-            .expect("Unable to fetch target file access time");
-        let access_time_diff = access_time
-            .duration_since(te.start)
-            .expect("Unable to compute access time delta");
-        assert!(access_time_diff.as_millis() < JIFFY_MS);
-
-        let mod_time = metadata
-            .accessed()
-            .expect("Unable to fetch target file modification time");
-        let mod_time_diff = mod_time
-            .duration_since(te.start)
-            .expect("Unable to compute modification time delta");
-        assert!(mod_time_diff.as_millis() < JIFFY_MS);
+    #[test]
+    fn test_no_args_existing_file() {
+        let te = TestEnv::new();
+        let filename = EXISTING_FILE;
+        te.assert_success_and_get_output(&[&filename]);
+        te.assert_file_touched(&filename);
     }
 
     #[test]
@@ -148,7 +162,7 @@ mod tests {
     }
 
     #[test]
-    fn test_noargs_no_path() {
+    fn test_no_args_no_path() {
         let te = TestEnv::new();
         te.assert_failure(&[]);
     }

@@ -81,11 +81,21 @@ struct Cli {
     gen_completions: Option<Option<Shell>>,
 }
 
-fn whiff(cli: &Cli, path: String) -> io::Result<()> {
-    let fh = if Path::new(&path).exists() {
+fn whiff(cli: &Cli, path: &String) -> io::Result<()> {
+    let filepath = Path::new(&path);
+    let fh = if filepath.exists() {
         File::options().append(true).open(path)?
     } else if !cli.no_create {
-        File::create_new(path)?
+        // We need to distinguish if path parent exists or not
+        match filepath.parent() {
+            Some(parent) => {
+                if parent != Path::new("") && !parent.exists() {
+                    panic!("whiff: cannot whiff '{}': No such file or directory", path)
+                }
+            }
+            None => {} // ignore
+        }
+        File::create_new(path).expect(format!("Unable to create path {}", path).as_str())
     } else {
         // touch command silently does nothing when
         // file does not exist and option -c is on
@@ -113,6 +123,13 @@ fn whiff(cli: &Cli, path: String) -> io::Result<()> {
 
     fh.set_times(times)
 }
+fn input_validation(cli: &Cli) {
+    // Input validation
+    if cli.inputs.len() == 0 {
+        eprintln!("Missing file operand\nTry `whiff --help` for more information");
+        process::exit(1);
+    }
+}
 
 fn main() {
     let cli = Cli::parse();
@@ -125,16 +142,18 @@ fn main() {
             }
             None => {
                 eprintln!("Generate completions request but no shell found");
-                process::exit(1);
+                process::exit(255);
             }
         }
     }
+
+    input_validation(&cli);
 
     // TODO: Avoid unnecessary clone here under
     let _results: io::Result<()> = cli
         .inputs
         .clone()
         .into_iter()
-        .try_for_each(|path| whiff(&cli, path));
+        .try_for_each(|path| whiff(&cli, &path));
     // TODO: Return error code
 }
