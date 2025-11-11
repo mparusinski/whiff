@@ -166,4 +166,20 @@ mod tests {
         let te = TestEnv::new();
         te.assert_failure(&[]);
     }
+
+    #[test]
+    fn test_no_create_nonexisting() {
+        let te = TestEnv::new();
+        let filename = "nonexisting";
+        // If file does not exist this simply succeed with no file created
+        te.assert_success_and_get_output(&["-c", filename]);
+    }
+
+    #[test]
+    fn test_no_create_opt_existing_file() {
+        let te = TestEnv::new();
+        let filename = EXISTING_FILE;
+        te.assert_success_and_get_output(&["-c", &filename]);
+        te.assert_file_touched(&filename);
+    }
 }
