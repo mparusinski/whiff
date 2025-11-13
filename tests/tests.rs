@@ -3,7 +3,8 @@ use std::fs;
 use std::io;
 // #[cfg(unix)]
 // use std::os::unix;
-use std::fs::File;
+use chrono::{DateTime, Local, NaiveDate, TimeZone, Utc};
+use std::fs::{File, FileTimes};
 #[cfg(windows)]
 use std::os::windows;
 use std::path::{Path, PathBuf};
@@ -13,6 +14,7 @@ use std::time::SystemTime;
 use tempdir::TempDir;
 
 static JIFFY_MS: u128 = 100;
+static EMPTY_FILE: &str = "empty";
 static EXISTING_FILE: &str = "existing";
 
 pub struct TestEnv {
@@ -41,6 +43,12 @@ fn create_working_directory() -> Result<TempDir, io::Error> {
     TempDir::new("whiff_tests")
 }
 
+/// Convert SystemTime to chrono::DateTime
+fn convert_systemtime_to_chrono(st: &SystemTime) -> DateTime<Utc> {
+    let seconds = st.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
+    DateTime::from_timestamp_secs(seconds.try_into().unwrap()).expect("Datetime conversion failed")
+}
+
 /// Find the *whiff* executable
 fn find_whiff_exe() -> PathBuf {
     let root = env::current_exe()
@@ -63,7 +71,14 @@ impl TestEnv {
         let whiff_exe = find_whiff_exe();
 
         let existing_filepath = temp_dir.path().join(Path::new(&EXISTING_FILE));
-        File::create(existing_filepath).expect("Unable to create existing file for test");
+        let existing_fh =
+            File::create(existing_filepath).expect("Unable to create existing file for test");
+        let existing_ft = FileTimes::new()
+            .set_accessed(SystemTime::UNIX_EPOCH)
+            .set_modified(SystemTime::UNIX_EPOCH);
+        existing_fh
+            .set_times(existing_ft)
+            .expect("Failure to set existing file times to UNIX_EPOCH");
 
         TestEnv {
             start,
@@ -88,6 +103,10 @@ impl TestEnv {
             .expect("whiff output")
     }
 
+    pub fn get_filepath(&self, file: &str) -> PathBuf {
+        self.test_root().join(file)
+    }
+
     pub fn assert_success_and_get_output(&self, args: &[&str]) -> process::Output {
         let output = self.run_command(Path::new("."), args);
 
@@ -106,13 +125,7 @@ impl TestEnv {
         }
     }
 
-    pub fn assert_file_touched(&self, file: &str) {
-        let filepath = self.test_root().join(file);
-        assert!(fs::exists(filepath.clone()).expect("Unable to determine target file existence"));
-
-        let metadata = fs::metadata(&filepath).expect("Unable to access target file metadata");
-        // Checking access timestamp are close enough as there is always
-        // some delay between when the test starts and the file is created
+    pub fn assert_access_time_touched(&self, metadata: &fs::Metadata) {
         let access_time = metadata
             .accessed()
             .expect("Unable to fetch target file access time");
@@ -120,7 +133,24 @@ impl TestEnv {
             .duration_since(self.start)
             .expect("Unable to compute access time delta");
         assert!(access_time_diff.as_millis() < JIFFY_MS);
+    }
 
+    pub fn assert_access_time_touched_with_datetime<Tz: TimeZone>(
+        &self,
+        metadata: &fs::Metadata,
+        datetime: &DateTime<Tz>,
+    ) {
+        let access_time = metadata
+            .accessed()
+            .expect("Unable to fetch target file access time");
+
+        assert_eq!(
+            convert_systemtime_to_chrono(&access_time),
+            datetime.to_utc().to_owned()
+        );
+    }
+
+    pub fn assert_mod_time_touched(&self, metadata: &fs::Metadata) {
         let mod_time = metadata
             .accessed()
             .expect("Unable to fetch target file modification time");
@@ -128,6 +158,44 @@ impl TestEnv {
             .duration_since(self.start)
             .expect("Unable to compute modification time delta");
         assert!(mod_time_diff.as_millis() < JIFFY_MS);
+    }
+
+    pub fn assert_mod_time_touched_with_datetime<Tz: TimeZone>(
+        &self,
+        metadata: &fs::Metadata,
+        datetime: &DateTime<Tz>,
+    ) {
+        let mod_time = metadata
+            .accessed()
+            .expect("Unable to fetch target file modification time");
+
+        assert_eq!(
+            convert_systemtime_to_chrono(&mod_time),
+            datetime.to_utc().to_owned()
+        );
+    }
+
+    pub fn assert_file_touched(&self, file: &str) {
+        let filepath = self.get_filepath(file);
+        assert!(fs::exists(filepath.clone()).expect("Unable to determine target file existence"));
+
+        let metadata = fs::metadata(&filepath).expect("Unable to access target file metadata");
+        // Checking access timestamp are close enough as there is always
+        // some delay between when the test starts and the file is created
+        self.assert_access_time_touched(&metadata);
+        self.assert_mod_time_touched(&metadata);
+    }
+
+    pub fn assert_file_touched_with_date<Tz: TimeZone>(&self, file: &str, datetime: &DateTime<Tz>) {
+        let filepath = self.get_filepath(file);
+        let metadata = fs::metadata(&filepath).expect("Unable to access target file metadata");
+        self.assert_access_time_touched_with_datetime(&metadata, datetime);
+        self.assert_mod_time_touched_with_datetime(&metadata, datetime);
+    }
+
+    pub fn assert_file_non_existing(&self, file: &str) {
+        let filepath = self.get_filepath(file);
+        assert!(!filepath.exists());
     }
 }
 
@@ -138,7 +206,7 @@ mod tests {
     #[test]
     fn test_no_args_valid_path() {
         let te = TestEnv::new();
-        let filename = "empty";
+        let filename = EMPTY_FILE;
         te.assert_success_and_get_output(&[filename]);
         te.assert_file_touched(filename);
     }
@@ -155,7 +223,7 @@ mod tests {
     fn test_no_args_invalid_path() {
         let te = TestEnv::new();
         let filename = Path::new("invalid")
-            .join("empty")
+            .join(EMPTY_FILE)
             .to_string_lossy()
             .to_string();
         te.assert_failure(&[filename.as_str()]);
@@ -165,5 +233,38 @@ mod tests {
     fn test_no_args_no_path() {
         let te = TestEnv::new();
         te.assert_failure(&[]);
+    }
+
+    #[test]
+    fn test_no_create_valid_path() {
+        let te = TestEnv::new();
+        let filename = EMPTY_FILE;
+        te.assert_success_and_get_output(&["-c", filename]);
+        te.assert_file_non_existing(filename);
+    }
+
+    #[test]
+    fn test_no_create_existing() {
+        let te = TestEnv::new();
+        let filename = EXISTING_FILE;
+        te.assert_success_and_get_output(&["-c", filename]);
+        te.assert_file_touched(&filename);
+    }
+
+    #[test]
+    fn test_date_valid_path_ex1() {
+        let te = TestEnv::new();
+        let filename = EMPTY_FILE;
+        te.assert_success_and_get_output(&["-d", "Sun, 29 Feb 2004 16:21:42  -0800", filename]);
+        // let expected_date = SystemTime::from
+        let expected_date = NaiveDate::from_ymd_opt(2004, 2, 29)
+            .unwrap()
+            .and_hms_opt(16, 21, 42)
+            .unwrap();
+        let expected_date = Local::now()
+            .timezone()
+            .from_local_datetime(&expected_date)
+            .unwrap();
+        te.assert_file_touched_with_date(filename, &expected_date);
     }
 }
