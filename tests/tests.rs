@@ -296,4 +296,12 @@ mod tests {
         let expected_date = DateTime::from_timestamp(expected_date.unix_timestamp(), 0).unwrap();
         te.assert_file_touched_with_date(filename, &expected_date);
     }
+
+    #[test]
+    fn test_ignored_force_option() {
+        let te = TestEnv::new();
+        let filename = EMPTY_FILE;
+        te.assert_success_and_get_output(&["-f", filename]);
+        te.assert_file_touched(&filename);
+    }
 }
