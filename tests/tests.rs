@@ -10,6 +10,7 @@ use std::os::windows;
 use std::path::{Path, PathBuf};
 use std::process;
 use std::time::SystemTime;
+use time::UtcDateTime;
 
 use tempdir::TempDir;
 
@@ -256,7 +257,6 @@ mod tests {
         let te = TestEnv::new();
         let filename = EMPTY_FILE;
         te.assert_success_and_get_output(&["-d", "Sun, 29 Feb 2004 16:21:42  -0800", filename]);
-        // let expected_date = SystemTime::from
         let expected_date = NaiveDate::from_ymd_opt(2004, 2, 29)
             .unwrap()
             .and_hms_opt(16, 21, 42)
@@ -265,6 +265,35 @@ mod tests {
             .timezone()
             .from_local_datetime(&expected_date)
             .unwrap();
+        te.assert_file_touched_with_date(filename, &expected_date);
+    }
+
+    #[test]
+    fn test_date_valid_path_ex2() {
+        let te = TestEnv::new();
+        let filename = EMPTY_FILE;
+        te.assert_success_and_get_output(&["-d", "2004-02-29 16:21:42", filename]);
+        let expected_date = NaiveDate::from_ymd_opt(2004, 2, 29)
+            .unwrap()
+            .and_hms_opt(16, 21, 42)
+            .unwrap();
+        let expected_date = Local::now()
+            .timezone()
+            .from_local_datetime(&expected_date)
+            .unwrap();
+        te.assert_file_touched_with_date(filename, &expected_date);
+    }
+
+    #[test]
+    fn test_date_valid_path_ex3() {
+        let te = TestEnv::new();
+        let filename = EMPTY_FILE;
+        te.assert_success_and_get_output(&["-d", "next Thursday", filename]);
+
+        let right_now = UtcDateTime::now();
+        let next_thursday = right_now.date().next_occurrence(time::Weekday::Thursday);
+        let expected_date = right_now.replace_date(next_thursday);
+        let expected_date = DateTime::from_timestamp(expected_date.unix_timestamp(), 0).unwrap();
         te.assert_file_touched_with_date(filename, &expected_date);
     }
 }
