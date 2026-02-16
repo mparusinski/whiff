@@ -87,15 +87,12 @@ fn whiff(cli: &Cli, path: &String) -> io::Result<()> {
         File::options().append(true).open(path)?
     } else if !cli.no_create {
         // We need to distinguish if path parent exists or not
-        match filepath.parent() {
-            Some(parent) => {
-                if parent != Path::new("") && !parent.exists() {
-                    panic!("whiff: cannot whiff '{}': No such file or directory", path)
-                }
+        if let Some(parent) = filepath.parent() {
+            if parent != Path::new("") && !parent.exists() {
+                panic!("whiff: cannot whiff '{}': No such file or directory", path)
             }
-            None => {} // ignore
         }
-        File::create_new(path).expect(format!("Unable to create path {}", path).as_str())
+        File::create_new(path).unwrap_or_else(|_| panic!("Unable to create path {}", path))
     } else {
         // touch command silently does nothing when
         // file does not exist and option -c is on
@@ -125,7 +122,7 @@ fn whiff(cli: &Cli, path: &String) -> io::Result<()> {
 }
 fn input_validation(cli: &Cli) {
     // Input validation
-    if cli.inputs.len() == 0 {
+    if cli.inputs.is_empty() {
         eprintln!("Missing file operand\nTry `whiff --help` for more information");
         process::exit(1);
     }
